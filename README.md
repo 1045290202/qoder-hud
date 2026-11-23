@@ -4,6 +4,10 @@
 
 当前版本：**1.0.0** · Windows 10/11 · WPF/GPU 渲染 · MIT
 
+![Qoder HUD 界面预览](docs/images/hud.png)
+
+> 界面预览使用内置演示数据，不包含本机任务。
+
 ## 特性
 
 - 来源标记：Qoder Desktop、JetBrains、CLI、未知来源。
@@ -13,6 +17,7 @@
 - 滚动列表带 200ms 缓出动画；托盘显示/隐藏、清空已完成、置顶开关。
 - WPF 保留模式 + GPU 合成，静态画面不整帧重绘。
 - 自适应工作区大小和缩放；可选显示器、位置和比例。
+- 内置演示截图模式，可生成不含本机任务的主界面和任务详情预览。
 
 ## 系统要求
 
@@ -77,6 +82,12 @@ HUD 可以独立运行；没有 Qoder 或 hooks 时会显示空闲界面。
 
 HUD 不抢焦点。滚轮需要 Windows 的“滚动非活动窗口”功能开启；详见 [故障排查](docs/troubleshooting.md)。
 
+单击任务后进入详情：
+
+![Qoder HUD 任务详情](docs/images/hud-detail.png)
+
+> 详情预览同样使用内置演示数据。
+
 ## 卸载
 
 运行 `uninstall.cmd`。需要同时删除配置、置顶状态和日志时运行 `uninstall.cmd -RemoveData`。
@@ -100,7 +111,14 @@ build.cmd      # 编译到 bin\
 package.ps1    # 编译并生成 release\QoderHud-<版本>.zip
 ```
 
-源码结构、架构、测试步骤和 GitHub Release 流程见 [开发与发布](docs/development.md)。
+重新生成 README 预览图：
+
+```text
+bin\QoderHud.exe --screenshot docs\images\hud.png
+bin\QoderHud.exe --screenshot-detail docs\images\hud-detail.png
+```
+
+截图模式使用内置演示任务，不读取配置、hooks、会话或标题数据库。源码结构、架构、测试步骤和 GitHub Release 流程见 [开发与发布](docs/development.md)。
 
 ## 文档
 
@@ -109,7 +127,7 @@ package.ps1    # 编译并生成 release\QoderHud-<版本>.zip
 - [故障排查](docs/troubleshooting.md)
 - [隐私说明](docs/privacy.md)
 - [开发与发布](docs/development.md)
-- [1.0.0 发布说明](docs/release-notes-1.0.0.md)
+- [更新日志](CHANGELOG.md)
 
 ## 许可证
 

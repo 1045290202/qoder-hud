@@ -22,7 +22,7 @@ foreach ($name in $binaryFiles) {
     Copy-Item -LiteralPath (Join-Path $root ('bin\' + $name)) -Destination (Join-Path $stage $name) -Force
 }
 
-$files = @('install.ps1','install.cmd','uninstall.cmd','config.example.json','README.md','LICENSE','VERSION')
+$files = @('install.ps1','install.cmd','uninstall.cmd','config.example.json','README.md','CHANGELOG.md','LICENSE','VERSION')
 foreach ($name in $files) {
     $source = Join-Path $root $name
     if (-not (Test-Path -LiteralPath $source)) { throw ('missing release file: ' + $name) }

@@ -40,8 +40,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\package.ps1
 
 | 文件 | 作用 |
 | --- | --- |
-| `src/Program.cs` | 入口、单实例互斥、全局异常、日志、版本号 |
-| `src/HudWindow.cs` | WPF 视觉树、任务状态、详情、滚动、托盘、hooks 管道 |
+| `src/Program.cs` | 入口、单实例互斥、`--screenshot` 参数、全局异常、日志、版本号 |
+| `src/HudWindow.cs` | WPF 视觉树、任务状态、详情、滚动、托盘、hooks 管道、演示截图渲染 |
 | `src/Model.cs` | `HudTask`、`FeedItem`、状态枚举 |
 | `src/Config.cs` | `config.json` 读取、默认值和 Clamp |
 | `src/AppPaths.cs` | 配置/日志/置顶状态路径 |
@@ -133,13 +133,35 @@ renderTier=2
 
 表示 WPF 正在使用硬件渲染层级。进程应加载 `wpfgfx_v0400.dll`、`d3d9.dll`、`DWMAPI.dll`。如果 HUD 顶部出现异常透明行，确认不透明窗口和 DWM 圆角/边框属性仍然生效。
 
+## 界面截图
+
+README 预览图由内置演示数据生成：
+
+```text
+bin\QoderHud.exe --screenshot docs\images\hud.png
+bin\QoderHud.exe --screenshot-detail docs\images\hud-detail.png
+```
+
+已安装版本可以直接调用：
+
+```text
+%LOCALAPPDATA%\QoderHud\QoderHud.exe --screenshot docs\images\hud.png
+%LOCALAPPDATA%\QoderHud\QoderHud.exe --screenshot-detail docs\images\hud-detail.png
+```
+
+- `--screenshot` 输出主界面；`--screenshot-detail` 打开演示任务详情后输出详情页。
+- 路径参数可省略，默认在当前目录生成 `hud-preview.png` 或 `hud-detail-preview.png`。
+- 输出为 2 倍图，尺寸 1920×984，PNG。
+- 截图模式使用固定的演示任务和静态帧，不读取配置、hooks、会话或标题数据库，也不会连接正在运行的 HUD。
+- 渲染完成后进程直接退出，不显示窗口、托盘或菜单位置。
+
 ## 发布流程
 
-1. 更新版本号：
+1. 更新版本号和变更记录：
    - `VERSION`
    - `src/Program.cs` 中的 `AssemblyVersion` / `AssemblyFileVersion` / `Program.Version`
    - `README.md` 的版本
-   - `docs/release-notes-<version>.md`
+   - `CHANGELOG.md`：把 `[Unreleased]` 的条目归档到 `[<version>] - YYYY-MM-DD`，并保留新的空 `[Unreleased]` 段
 2. 运行 `package.ps1`。
 3. 校验 ZIP SHA256，并写入 GitHub Release 正文。
 4. 初始化/提交 Git：
@@ -152,10 +174,10 @@ git remote add origin https://github.com/<owner>/<repo>.git
 git push -u origin main
 ```
 
-5. 创建 Release：
+5. 创建 Release。Release 正文从 `CHANGELOG.md` 对应版本段落复制：
 
 ```text
-gh release create v1.0.0 release/QoderHud-1.0.0.zip --title "Qoder HUD 1.0.0" --notes-file docs/release-notes-1.0.0.md
+gh release create v1.0.0 release/QoderHud-1.0.0.zip --title "Qoder HUD 1.0.0"
 ```
 
 发布前检查：

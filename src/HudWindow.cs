@@ -13,6 +13,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Drawing = System.Drawing;
@@ -92,6 +93,7 @@ namespace QoderHud
         readonly List<HudTask> tasks = new List<HudTask>();
         readonly List<FeedItem> feed = new List<FeedItem>();
         readonly Dictionary<string, CardView> cards = new Dictionary<string, CardView>();
+        readonly bool snapshotMode;
         readonly DispatcherTimer clockTimer;
         readonly DispatcherTimer pruneTimer;
         readonly DispatcherTimer clickTimer;
@@ -146,6 +148,7 @@ namespace QoderHud
         StatTile[] statTiles;
         FeedRow[] feedRows;
         TextBlock feedCountText;
+        TextBlock feedFootLabel;
         TextBlock feedFootRight;
         PillButton backBtn;
         PillButton goBtn;
@@ -162,8 +165,13 @@ namespace QoderHud
         Viewbox viewbox;
         bool displayWarned;
 
-        public HudWindow()
+        public HudWindow() : this(false)
         {
+        }
+
+        public HudWindow(bool snapshotMode)
+        {
+            this.snapshotMode = snapshotMode;
             WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
             ShowInTaskbar = false;
@@ -180,11 +188,19 @@ namespace QoderHud
             TextOptions.SetTextRenderingMode(this, TextRenderingMode.Grayscale);
             Title = "Qoder HUD";
 
-            HudConfigStore.EnsureFile();
-            config = HudConfigStore.Load();
-            TitleSource.SetOverrides(config.QoderDataDir, config.JetBrainsLogDir);
-            topMost = LoadTopMostPref(config.TopMost);
-            menuFont = MakeMenuFont();
+            if (snapshotMode)
+            {
+                config = new HudConfig();
+                topMost = false;
+            }
+            else
+            {
+                HudConfigStore.EnsureFile();
+                config = HudConfigStore.Load();
+                TitleSource.SetOverrides(config.QoderDataDir, config.JetBrainsLogDir);
+                topMost = LoadTopMostPref(config.TopMost);
+                menuFont = MakeMenuFont();
+            }
             dblMs = Math.Min(320, Forms.SystemInformation.DoubleClickTime);
 
             root = new Canvas();
@@ -202,7 +218,7 @@ namespace QoderHud
             BuildBackground();
             BuildMain();
             BuildDetail();
-            BuildTray();
+            if (!snapshotMode) BuildTray();
 
             root.MouseLeftButtonUp += delegate (object s, MouseButtonEventArgs e)
             {
@@ -246,10 +262,13 @@ namespace QoderHud
             pruneTimer.Interval = TimeSpan.FromMinutes(1);
             pruneTimer.Tick += delegate { Prune(); };
 
-            UpdateClock(DateTime.Now);
-            Place();
-            SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
-            Loaded += OnLoaded;
+            if (!snapshotMode)
+            {
+                UpdateClock(DateTime.Now);
+                Place();
+                SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+                Loaded += OnLoaded;
+            }
         }
 
         void OnLoaded(object sender, RoutedEventArgs e)
@@ -270,6 +289,121 @@ namespace QoderHud
             Log("loaded hwnd=" + hwnd + " dpi=" + dpi + " renderTier=" + tier + " bounds=" + Left + "," + Top + " " + Width + "x" + Height
                 + " display=" + config.Display + " position=" + config.Position + " scale=" + config.Scale.ToString(CultureInfo.InvariantCulture)
                 + " topmost=" + topMost);
+        }
+
+        public void LoadDemoData(bool openDetail)
+        {
+            DateTime now = DateTime.Now;
+            tasks.Clear();
+            feed.Clear();
+            foreach (CardView cv in cards.Values) cardsCanvas.Children.Remove(cv);
+            cards.Clear();
+            detailTask = null;
+            totalEvents = 27;
+            lastEventAt = now.AddSeconds(-18);
+
+            HudTask waiting = new HudTask();
+            waiting.SessionId = "7f31c92a";
+            waiting.Title = "重构登录模块的会话刷新逻辑";
+            waiting.Prompt = "登录过期后偶发 401，请检查令牌刷新与重试链路。";
+            waiting.Cwd = "C:\\demo\\web-console";
+            waiting.Model = "Qoder Pro";
+            waiting.Origin = "JetBrains";
+            waiting.OriginChain = "idea64.exe";
+            waiting.Hint = "确认：编辑文件";
+            waiting.PendingTool = "Edit";
+            waiting.LastTool = "Edit";
+            waiting.LastToolDetail = "src/auth/session.ts";
+            waiting.State = TaskState.NeedsInput;
+            waiting.StartedAt = now.AddMinutes(-14);
+            waiting.StateSince = now.AddSeconds(-34);
+            waiting.LastEvent = now.AddSeconds(-34);
+            waiting.TitleReal = true;
+            tasks.Add(waiting);
+
+            HudTask running = new HudTask();
+            running.SessionId = "b28e4d10";
+            running.Title = "为订单服务补充批量导出接口";
+            running.Prompt = "新增 CSV 导出，支持按日期筛选和分页。";
+            running.Cwd = "C:\\demo\\order-api";
+            running.Model = "Qwen3-Coder";
+            running.Origin = "Desktop";
+            running.LastTool = "Grep";
+            running.LastToolDetail = "exportOrders";
+            running.State = TaskState.Running;
+            running.StartedAt = now.AddMinutes(-9);
+            running.StateSince = now.AddSeconds(-252);
+            running.LastEvent = now.AddMinutes(-3);
+            running.TitleReal = true;
+            tasks.Add(running);
+
+            HudTask done = new HudTask();
+            done.SessionId = "c91a6b3e";
+            done.Title = "更新部署文档与回滚步骤";
+            done.Prompt = "把蓝绿发布的回滚流程写进 README，覆盖失败判定、流量切换顺序、回滚命令和常见故障处理，并补充验证清单、负责人确认和演练记录，最后附上灰度观察指标与回归检查项。";
+            done.Cwd = "C:\\demo\\infra-docs";
+            done.Model = "Qoder Pro";
+            done.Origin = "CLI";
+            done.LastMessage = "已补充回滚步骤与命令示例，并加入失败判定、流量切换顺序、常见故障处理和验证清单。文档位于 docs/deploy.md，可直接用于下一次发布演练；同时补充了负责人确认、演练记录模板和发布后 24 小时观察项。";
+            done.State = TaskState.Done;
+            done.StartedAt = now.AddMinutes(-22);
+            done.DoneAt = now.AddMinutes(-6);
+            done.StateSince = done.DoneAt;
+            done.LastEvent = done.DoneAt;
+            done.TitleReal = true;
+            tasks.Add(done);
+
+            feed.Add(new FeedItem(now.AddSeconds(-34), waiting.SessionId, "等待确认 · 编辑文件", WaitingColor));
+            feed.Add(new FeedItem(now.AddMinutes(-3), running.SessionId, "工具 · Grep · exportOrders", RunningColor));
+            feed.Add(new FeedItem(now.AddMinutes(-6), done.SessionId, "完成 · 更新部署文档", DoneColor));
+            feed.Add(new FeedItem(now.AddMinutes(-9), running.SessionId, "开始 · 订单导出接口", RunningColor));
+            feed.Add(new FeedItem(now.AddMinutes(-14), waiting.SessionId, "开始 · 会话刷新逻辑", RunningColor));
+            feed.Add(new FeedItem(now.AddMinutes(-15), done.SessionId, "工具 · Edit · docs/deploy.md", RunningColor));
+            feed.Add(new FeedItem(now.AddMinutes(-18), done.SessionId, "工具 · Read · docs/deploy.md", RunningColor));
+            feed.Add(new FeedItem(now.AddMinutes(-22), done.SessionId, "开始 · 部署文档与回滚", RunningColor));
+
+            if (openDetail) detailTask = done;
+            RefreshAll();
+            UpdateClock(now);
+        }
+
+        public void SaveScreenshot(string path, double scale)
+        {
+            if (string.IsNullOrWhiteSpace(path)) path = "hud-preview.png";
+            if (scale < 1.0) scale = 1.0;
+            string fullPath;
+            try { fullPath = Path.GetFullPath(path); }
+            catch { fullPath = path; }
+            string dir = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+            Brush oldBackground = root.Background;
+            root.Background = Background;
+            try
+            {
+                TextOptions.SetTextFormattingMode(root, TextFormattingMode.Ideal);
+                TextOptions.SetTextRenderingMode(root, TextRenderingMode.Grayscale);
+                root.Measure(new Size(DesignW, DesignH));
+                root.Arrange(new Rect(0, 0, DesignW, DesignH));
+                root.UpdateLayout();
+
+                int pixelW = (int)Math.Round(DesignW * scale);
+                int pixelH = (int)Math.Round(DesignH * scale);
+                RenderTargetBitmap bitmap = new RenderTargetBitmap(
+                    pixelW, pixelH, 96.0 * scale, 96.0 * scale, PixelFormats.Pbgra32);
+                bitmap.Render(root);
+
+                PngBitmapEncoder encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                using (FileStream stream = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    encoder.Save(stream);
+                }
+            }
+            finally
+            {
+                root.Background = oldBackground;
+            }
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -541,10 +675,10 @@ namespace QoderHud
             Canvas.SetLeft(footDot, 16);
             Canvas.SetTop(footDot, 278);
             pc.Children.Add(footDot);
-            TextBlock footLabel = Txt("管道在线", 14, TextSecondary, false, false);
-            Canvas.SetLeft(footLabel, 30);
-            Canvas.SetTop(footLabel, 270);
-            pc.Children.Add(footLabel);
+            feedFootLabel = Txt(snapshotMode ? "演示数据" : "管道在线", 14, TextSecondary, false, false);
+            Canvas.SetLeft(feedFootLabel, 30);
+            Canvas.SetTop(feedFootLabel, 270);
+            pc.Children.Add(feedFootLabel);
             feedFootRight = Txt("等待事件", 14, TextTertiary, false, false);
             Canvas.SetRight(feedFootRight, 16);
             Canvas.SetTop(feedFootRight, 270);
@@ -960,6 +1094,7 @@ namespace QoderHud
 
         void SaveTopMostPref()
         {
+            if (snapshotMode) return;
             try
             {
                 AppPaths.Ensure();
@@ -1130,7 +1265,7 @@ namespace QoderHud
 
         void StartPipeServer()
         {
-            if (pipeStarted) return;
+            if (snapshotMode || pipeStarted) return;
             pipeStarted = true;
             Thread th = new Thread(delegate ()
             {
@@ -1557,7 +1692,7 @@ namespace QoderHud
 
         void RequestTitle(HudTask t)
         {
-            if (t == null) return;
+            if (snapshotMode || t == null) return;
             if (t.TitleBusy)
             {
                 t.TitleAgain = true;
@@ -1926,7 +2061,12 @@ namespace QoderHud
             SetText(statusText, status);
             SetFill(statusDot, dot);
             bool pulse = waiting > 0 || running > 0;
-            if (pulse)
+            if (snapshotMode)
+            {
+                statusDot.BeginAnimation(UIElement.OpacityProperty, null);
+                statusDot.Opacity = 1;
+            }
+            else if (pulse)
             {
                 if (!statusPulsing)
                 {
@@ -2001,6 +2141,13 @@ namespace QoderHud
         void UpdateAmber()
         {
             bool on = WaitingCount() > 0;
+            if (snapshotMode)
+            {
+                amberOn = on;
+                amberGlow.BeginAnimation(UIElement.OpacityProperty, null);
+                amberGlow.Opacity = on ? 1.0 : 0.0;
+                return;
+            }
             if (on == amberOn) return;
             amberOn = on;
             DoubleAnimation a = new DoubleAnimation(on ? 1.0 : 0.0, new Duration(TimeSpan.FromMilliseconds(400)));
@@ -2474,6 +2621,11 @@ namespace QoderHud
                 lastPulseState = t.State;
                 lastPulseStart = t.DonePulseStart;
                 accent.BeginAnimation(UIElement.OpacityProperty, null);
+                if (owner.snapshotMode)
+                {
+                    accent.Opacity = t.State == TaskState.Done ? 0.84 : 1.0;
+                    return;
+                }
                 if (t.State == TaskState.Running)
                 {
                     DoubleAnimation a = new DoubleAnimation(0.55, 0.95, new Duration(TimeSpan.FromMilliseconds(1200)));

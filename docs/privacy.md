@@ -59,6 +59,10 @@ IDEA_*, TERM_PROGRAM
 - 不读取 Qoder 登录凭据；
 - 不包含广告、遥测或自动更新网络请求。
 
+## 截图模式
+
+`QoderHud.exe --screenshot <path>` 和 `--screenshot-detail <path>` 只渲染内置演示数据，不读取本机配置、hooks 管道、任务、标题数据库或日志内容。生成的 PNG 可以直接公开使用。
+
 ## 安全提示
 
 - 发布包是未签名的可执行文件，Windows SmartScreen 可能提示；请从可信的 Release 下载并校验 SHA256。
