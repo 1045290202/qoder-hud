@@ -1,0 +1,8 @@
+bin/
+release/
+legacy/
+.vs/
+.idea/
+*.user
+*.suo
+*.zip
