@@ -33,6 +33,7 @@ namespace QoderHud
         public bool TitleReal;
         public bool TitleBusy;
         public bool TitleAgain;
+        public bool Stopped;
     }
 
     sealed class FeedItem

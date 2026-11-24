@@ -84,6 +84,7 @@ namespace QoderHud
         static readonly Color RunningColor = Color.FromArgb(255, 77, 157, 255);
         static readonly Color WaitingColor = Color.FromArgb(255, 255, 180, 67);
         static readonly Color DoneColor = Color.FromArgb(255, 62, 213, 152);
+        static readonly Color StoppedColor = Color.FromArgb(255, 148, 163, 184);
         static readonly Color BadgeText = Color.FromArgb(255, 8, 13, 21);
         static readonly CultureInfo Zh = CultureInfo.GetCultureInfo("zh-CN");
 
@@ -96,7 +97,9 @@ namespace QoderHud
         readonly bool snapshotMode;
         readonly DispatcherTimer clockTimer;
         readonly DispatcherTimer pruneTimer;
+        readonly DispatcherTimer reconcileTimer;
         readonly DispatcherTimer clickTimer;
+        bool reconcileBusy;
         Forms.NotifyIcon tray;
         Forms.ContextMenuStrip mainMenu;
         Forms.ContextMenuStrip cardMenu;
@@ -261,6 +264,9 @@ namespace QoderHud
             pruneTimer = new DispatcherTimer();
             pruneTimer.Interval = TimeSpan.FromMinutes(1);
             pruneTimer.Tick += delegate { Prune(); };
+            reconcileTimer = new DispatcherTimer();
+            reconcileTimer.Interval = TimeSpan.FromSeconds(3);
+            reconcileTimer.Tick += delegate { ReconcileInterruptedTasks(); };
 
             if (!snapshotMode)
             {
@@ -280,6 +286,7 @@ namespace QoderHud
             RefreshAll();
             if (!clockTimer.IsEnabled) clockTimer.Start();
             if (!pruneTimer.IsEnabled) pruneTimer.Start();
+            if (!reconcileTimer.IsEnabled) reconcileTimer.Start();
             double dpi = 1;
             try { dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip; }
             catch { }
@@ -439,6 +446,7 @@ namespace QoderHud
                 e.Cancel = true;
                 Hide();
                 if (clockTimer != null) clockTimer.Stop();
+                if (reconcileTimer != null) reconcileTimer.Stop();
                 return;
             }
             base.OnClosing(e);
@@ -450,6 +458,7 @@ namespace QoderHud
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             if (clockTimer != null) clockTimer.Stop();
             if (pruneTimer != null) pruneTimer.Stop();
+            if (reconcileTimer != null) reconcileTimer.Stop();
             if (clickTimer != null) clickTimer.Stop();
             if (tray != null) { tray.Visible = false; tray.Dispose(); tray = null; }
             if (mainMenu != null) { mainMenu.Dispose(); mainMenu = null; }
@@ -1150,6 +1159,7 @@ namespace QoderHud
             {
                 Hide();
                 clockTimer.Stop();
+                reconcileTimer.Stop();
             }
             else ShowNoActivate();
         }
@@ -1161,6 +1171,7 @@ namespace QoderHud
             Native.ShowWindow(hwnd, 8); // SW_SHOWNA
             ApplyTopMost();
             if (!clockTimer.IsEnabled) clockTimer.Start();
+            if (!reconcileTimer.IsEnabled) reconcileTimer.Start();
             RefreshAll();
         }
 
@@ -1169,6 +1180,7 @@ namespace QoderHud
             reallyExit = true;
             if (clockTimer != null) clockTimer.Stop();
             if (pruneTimer != null) pruneTimer.Stop();
+            if (reconcileTimer != null) reconcileTimer.Stop();
             if (tray != null) tray.Visible = false;
             Application.Current.Shutdown();
         }
@@ -1219,6 +1231,13 @@ namespace QoderHud
         {
             int n = 0;
             foreach (HudTask t in tasks) if (t.State == TaskState.Done) n++;
+            return n;
+        }
+
+        int StoppedCount()
+        {
+            int n = 0;
+            foreach (HudTask t in tasks) if (t.State == TaskState.Done && t.Stopped) n++;
             return n;
         }
 
@@ -1556,6 +1575,82 @@ namespace QoderHud
             t.StateSince = DateTime.Now;
             t.Hint = hint;
             if (state != TaskState.NeedsInput) t.PendingTool = "";
+            if (state != TaskState.Done) t.Stopped = false;
+        }
+
+        void ReconcileInterruptedTasks()
+        {
+            if (snapshotMode || closing || reconcileBusy) return;
+            List<ReconcileProbe> probes = new List<ReconcileProbe>();
+            foreach (HudTask t in tasks)
+            {
+                if (t.State != TaskState.Running && t.State != TaskState.NeedsInput) continue;
+                if (string.IsNullOrEmpty(t.SessionId)) continue;
+                ReconcileProbe probe = new ReconcileProbe();
+                probe.SessionId = t.SessionId;
+                probe.Origin = t.Origin;
+                probe.StartedAt = t.StartedAt;
+                probes.Add(probe);
+            }
+            if (probes.Count == 0) return;
+
+            reconcileBusy = true;
+            ThreadPool.QueueUserWorkItem(delegate (object state)
+            {
+                List<ReconcileHit> hits = new List<ReconcileHit>();
+                foreach (ReconcileProbe probe in probes)
+                {
+                    DateTime interruptedAt;
+                    if (!TitleSource.LastInterrupted(probe.SessionId, probe.Origin, probe.StartedAt, out interruptedAt)) continue;
+                    if (interruptedAt <= probe.StartedAt) continue;
+                    ReconcileHit hit = new ReconcileHit();
+                    hit.SessionId = probe.SessionId;
+                    hit.StartedAt = probe.StartedAt;
+                    hit.InterruptedAt = interruptedAt;
+                    hits.Add(hit);
+                }
+                try
+                {
+                    Dispatcher.BeginInvoke(new Action(delegate
+                    {
+                        reconcileBusy = false;
+                        if (closing) return;
+                        bool changed = false;
+                        foreach (ReconcileHit hit in hits)
+                        {
+                            HudTask t = Find(hit.SessionId);
+                            if (t == null) continue;
+                            if (t.State != TaskState.Running && t.State != TaskState.NeedsInput) continue;
+                            if (t.StartedAt != hit.StartedAt) continue;
+                            MarkStopped(t, hit.InterruptedAt);
+                            changed = true;
+                        }
+                        if (changed) RefreshAll();
+                    }));
+                }
+                catch
+                {
+                    reconcileBusy = false;
+                }
+            });
+        }
+
+        void MarkStopped(HudTask t, DateTime when)
+        {
+            if (t == null || (t.State != TaskState.Running && t.State != TaskState.NeedsInput)) return;
+            t.Stopped = true;
+            SetState(t, TaskState.Done, "已停止");
+            DateTime now = DateTime.Now;
+            if (when > t.StartedAt && when <= now.AddMinutes(1))
+            {
+                t.StateSince = when;
+                t.DoneAt = when;
+                t.LastEvent = when;
+            }
+            t.LastTool = "";
+            t.LastToolDetail = "";
+            AddFeed(t.SessionId, "已停止 · " + TrimTo(t.Title, 24), StoppedColor);
+            Log("stopped " + ShortId(t.SessionId) + " at " + when.ToString("HH:mm:ss"));
         }
 
         static string ShortId(string sid)
@@ -2020,6 +2115,7 @@ namespace QoderHud
             int waiting = WaitingCount();
             int running = RunningCount();
             int done = DoneCount();
+            int stopped = StoppedCount();
             Color dot;
             string status;
             if (waiting > 0)
@@ -2034,8 +2130,14 @@ namespace QoderHud
             }
             else if (done > 0)
             {
-                dot = DoneColor;
-                status = done + " 个已完成";
+                int completed = done - stopped;
+                dot = completed > 0 ? DoneColor : StoppedColor;
+                if (completed > 0 && stopped > 0)
+                    status = completed + " 个已完成 · " + stopped + " 个已停止";
+                else if (completed > 0)
+                    status = completed + " 个已完成";
+                else
+                    status = stopped + " 个任务已停止";
             }
             else
             {
@@ -2169,9 +2271,10 @@ namespace QoderHud
         {
             HudTask t = detailTask;
             if (t == null) return;
-            Color state = StateColor(t.State);
+            bool stopped = t.State == TaskState.Done && t.Stopped;
+            Color state = stopped ? StoppedColor : StateColor(t.State);
             string stateLabel = t.State == TaskState.NeedsInput ? "需要处理"
-                : (t.State == TaskState.Running ? "运行中" : "已完成");
+                : (t.State == TaskState.Running ? "运行中" : (stopped ? "已停止" : "已完成"));
 
             SetText(detailTitle, t.Title.Length > 0 ? t.Title : "未命名任务");
             StringBuilder meta = new StringBuilder();
@@ -2185,7 +2288,8 @@ namespace QoderHud
 
             SetText(detailPrompt, t.Prompt.Length > 0 ? t.Prompt : "（未捕获到用户输入，任务从工具事件恢复）");
             bool waiting = t.State == TaskState.NeedsInput;
-            string reply = t.LastMessage.Length > 0 ? t.LastMessage : (waiting && t.Hint.Length > 0 ? t.Hint : "—");
+            string reply = t.LastMessage.Length > 0 ? t.LastMessage
+                : (stopped ? "任务已手动停止。" : (waiting && t.Hint.Length > 0 ? t.Hint : "—"));
             SetText(detailReply, reply);
             SetFg(detailReply, t.LastMessage.Length > 0 ? TextSecondary
                 : (waiting ? Color.FromArgb(255, 255, 214, 153) : TextTertiary));
@@ -2384,6 +2488,7 @@ namespace QoderHud
             }
             if (t.State == TaskState.Done)
             {
+                if (t.Stopped) return project + " · 已手动停止 · 单击查看详情";
                 if (t.LastMessage.Length > 0) return project + " · 回复：" + t.LastMessage;
                 return project + " · 已完成 · 单击查看详情";
             }
@@ -2398,6 +2503,20 @@ namespace QoderHud
         void Log(string msg)
         {
             Program.WriteLog(msg);
+        }
+
+        sealed class ReconcileProbe
+        {
+            public string SessionId;
+            public string Origin;
+            public DateTime StartedAt;
+        }
+
+        sealed class ReconcileHit
+        {
+            public string SessionId;
+            public DateTime StartedAt;
+            public DateTime InterruptedAt;
         }
 
         // ---------------- nested UI parts ----------------
@@ -2560,15 +2679,18 @@ namespace QoderHud
             public void Update(HudTask t, DateTime now)
             {
                 task = t;
-                Color state = StateColor(t.State);
+                bool stopped = t.State == TaskState.Done && t.Stopped;
+                Color state = stopped ? StoppedColor : StateColor(t.State);
                 bool needs = t.State == TaskState.NeedsInput;
-                string label = needs ? "需要处理" : (t.State == TaskState.Running ? "运行中" : "已完成");
+                string label = needs ? "需要处理"
+                    : (t.State == TaskState.Running ? "运行中" : (stopped ? "已停止" : "已完成"));
                 if (badgeText.Text != label)
                 {
                     badgeText.Text = label;
                     badge.Background = Br(state);
                 }
-                SetBorder(baseBorder, needs ? Color.FromArgb(165, state.R, state.G, state.B) : BorderNormal);
+                SetBorder(baseBorder, needs ? Color.FromArgb(165, state.R, state.G, state.B)
+                    : (stopped ? Color.FromArgb(110, state.R, state.G, state.B) : BorderNormal));
 
                 SetFill(originDot, OriginColor(t.Origin));
                 SetText(originText, OriginLabel(t.Origin));

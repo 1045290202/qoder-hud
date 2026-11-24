@@ -2,7 +2,7 @@
 
 在副屏、小屏或桌面角落显示 Qoder 任务的实时仪表盘。集中展示 Qoder Desktop、JetBrains 插件和 qodercli 会话的来源、标题、状态、当前工具和最近活动。
 
-当前版本：**1.0.0** · Windows 10/11 · WPF/GPU 渲染 · MIT
+当前版本：**1.0.1** · Windows 10/11 · WPF/GPU 渲染 · MIT
 
 ![Qoder HUD 界面预览](docs/images/hud.png)
 
@@ -30,7 +30,7 @@ HUD 可以独立运行；没有 Qoder 或 hooks 时会显示空闲界面。
 
 ## 安装
 
-1. 从 GitHub Releases 下载 `QoderHud-1.0.0.zip` 并解压。
+1. 从 GitHub Releases 下载 `QoderHud-1.0.1.zip` 并解压。
 2. 双击 `install.cmd`；需要开机自启时运行 `install.cmd -Autostart`。
 3. 重启 Qoder 或新开一个会话，让新的 hooks 生效。
 
