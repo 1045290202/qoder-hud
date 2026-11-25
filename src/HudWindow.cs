@@ -1968,40 +1968,18 @@ namespace QoderHud
             AfterTasksChanged();
         }
 
-        static readonly string[] TerminalHostNames =
-        {
-            "WindowsTerminal", "Alacritty", "WezTerm", "Hyper", "Tabby",
-            "FluentTerminal", "Mintty", "Terminus", "Wave", "Contour"
-        };
-
-        static readonly string[] ConsoleProcessNames =
-        {
-            "conhost", "OpenConsole", "cmd", "powershell", "pwsh", "bash", "wsl"
-        };
-
         void FocusQoder(HudTask task)
         {
             try
             {
                 string origin = task != null ? task.Origin : "";
-                string chain = task != null ? task.OriginChain : "";
                 IntPtr best = IntPtr.Zero;
-                if (origin == "JetBrains")
+                if (origin == "JetBrains" || origin == "CLI")
                 {
                     ShowFocusError(origin);
                     return;
                 }
-                if (origin == "CLI")
-                {
-                    string terminal = FindTerminalHostName(chain);
-                    if (terminal.Length > 0) best = FindMainWindow(terminal, "");
-                    if (best == IntPtr.Zero)
-                    {
-                        string console = FindChainProcessName(chain, ConsoleProcessNames);
-                        if (console.Length > 0) best = FindMainWindow(console, "");
-                    }
-                }
-                else if (origin == "Desktop")
+                if (origin == "Desktop")
                 {
                     best = FindMainWindow("Qoder", "Qoder");
                 }
@@ -2019,58 +1997,16 @@ namespace QoderHud
             }
         }
 
-        static void ShowFocusError(string origin)
+        void ShowFocusError(string origin)
         {
             string message;
             if (origin == "JetBrains") message = "JetBrains 插件暂不支持自动跳转。";
-            else if (origin == "CLI") message = "未找到任务对应的终端窗口。";
+            else if (origin == "CLI") message = "CLI 暂不支持自动跳转。";
             else if (origin == "Desktop") message = "未找到 Qoder 窗口。";
             else message = "无法识别任务来源，未执行跳转。";
-            MessageBox.Show(message, "Qoder HUD", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        static string FindTerminalHostName(string chain)
-        {
-            foreach (string raw in ChainParts(chain))
-            {
-                string name = ProcessName(raw);
-                if (name.Equals("wt", StringComparison.OrdinalIgnoreCase)) return "WindowsTerminal";
-                if (NameInList(name, TerminalHostNames)) return name;
-            }
-            return "";
-        }
-
-        static string FindChainProcessName(string chain, string[] names)
-        {
-            foreach (string raw in ChainParts(chain))
-            {
-                string name = ProcessName(raw);
-                if (NameInList(name, names)) return name;
-            }
-            return "";
-        }
-
-        static bool NameInList(string name, string[] names)
-        {
-            foreach (string candidate in names)
-                if (name.Equals(candidate, StringComparison.OrdinalIgnoreCase)) return true;
-            return false;
-        }
-
-        static string[] ChainParts(string chain)
-        {
-            if (string.IsNullOrEmpty(chain)) return new string[0];
-            return chain.Split(new string[] { "<-" }, StringSplitOptions.None);
-        }
-
-        static string ProcessName(string raw)
-        {
-            string name = (raw ?? "").Trim().Trim('"');
-            int slash = Math.Max(name.LastIndexOf('\\'), name.LastIndexOf('/'));
-            if (slash >= 0) name = name.Substring(slash + 1);
-            if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                name = name.Substring(0, name.Length - 4);
-            return name;
+            if (tray == null) return;
+            try { tray.ShowBalloonTip(3000, "Qoder HUD", message, Forms.ToolTipIcon.Info); }
+            catch { Program.WriteLog("focus notice failed origin=" + origin); }
         }
 
         static IntPtr FindMainWindow(string processName, string preferredTitle)
