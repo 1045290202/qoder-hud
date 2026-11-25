@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-11-25
+
+### Changed
+
+- 安装器默认创建或更新开机自启快捷方式，不再需要 `-Autostart`；可用 `-Autostart:$false` 关闭，或 `-SkipStartup` 保留当前状态。
+
 ## [1.0.2] - 2026-11-25
 
 ### Changed

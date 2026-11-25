@@ -9,14 +9,14 @@ using Forms = System.Windows.Forms;
 [assembly: System.Reflection.AssemblyTitle("Qoder HUD")]
 [assembly: System.Reflection.AssemblyDescription("Qoder task dashboard for a secondary display")]
 [assembly: System.Reflection.AssemblyProduct("Qoder HUD")]
-[assembly: System.Reflection.AssemblyVersion("1.0.2.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.0.2.0")]
+[assembly: System.Reflection.AssemblyVersion("1.0.3.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.0.3.0")]
 
 namespace QoderHud
 {
     static class Program
     {
-        public const string Version = "1.0.2";
+        public const string Version = "1.0.3";
         static readonly object LogLock = new object();
 
         public static void WriteLog(string msg)

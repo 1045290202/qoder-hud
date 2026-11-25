@@ -4,7 +4,7 @@ param(
     [string]$SettingsPath = (Join-Path $env:USERPROFILE '.qoder\settings.json'),
     [switch]$NoHooks,
     [switch]$NoStart,
-    [switch]$Autostart,
+    [switch]$Autostart = $true,
     [switch]$SkipStartup,
     [switch]$Uninstall,
     [switch]$RemoveData
@@ -202,7 +202,7 @@ function Set-StartupShortcut([string]$Target) {
             $sc = $ws.CreateShortcut($ShortcutPath)
             if ([string]$sc.TargetPath -match 'QoderHud\.exe') {
                 Remove-Item -LiteralPath $ShortcutPath -Force
-                Info '已移除指向旧路径的开机自启快捷方式（需要自启请加 -Autostart）'
+                Info '已移除开机自启快捷方式（默认启用自启；如需关闭请加 -Autostart:$false）'
             }
         } catch {
         }

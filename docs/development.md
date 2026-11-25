@@ -169,7 +169,7 @@ bin\QoderHud.exe --screenshot-detail docs\images\hud-detail.png
 ```text
 git init -b main
 git add .
-git commit -m "Qoder HUD 1.0.2"
+git commit -m "Qoder HUD <version>"
 git remote add origin https://github.com/<owner>/<repo>.git
 git push -u origin main
 ```
@@ -177,7 +177,7 @@ git push -u origin main
 5. 创建 Release。Release 正文从 `CHANGELOG.md` 对应版本段落复制：
 
 ```text
-gh release create v1.0.2 release/QoderHud-1.0.2.zip --title "Qoder HUD 1.0.2"
+gh release create v<version> release/QoderHud-<version>.zip --title "Qoder HUD <version>"
 ```
 
 发布前检查：

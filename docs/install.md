@@ -3,13 +3,20 @@
 ## 快速安装
 
 1. 解压发布包。
-2. 双击 `install.cmd`。需要开机自启时运行：
+2. 双击 `install.cmd`。安装器默认创建或更新开机自启快捷方式，并立即启动 HUD。
+3. 如果 Qoder 已经在运行，重启 Qoder 或新开一个会话，让它加载新的 hooks。
+
+不需要开机自启时运行：
 
 ```text
-install.cmd -Autostart
+install.cmd -Autostart:$false
 ```
 
-3. 如果 Qoder 已经在运行，重启 Qoder 或新开一个会话，让它加载新的 hooks。
+只想跳过自启配置、保留当前启动项状态时运行：
+
+```text
+install.cmd -SkipStartup
+```
 
 安装器不需要管理员权限，默认使用 Windows 自带的 PowerShell。
 
@@ -31,7 +38,7 @@ install.cmd [-Autostart] [-NoHooks] [-NoStart] [-SkipStartup]
              [-InstallDir <目录>] [-SettingsPath <settings.json>]
 ```
 
-- `-Autostart`：创建/更新开机自启快捷方式；如果旧快捷方式指向旧路径，会一并更新。
+- `-Autostart`：默认启用，创建/更新开机自启快捷方式；如果旧快捷方式指向旧路径，会一并更新。传 `-Autostart:$false` 可移除已有快捷方式。
 - `-NoHooks`：只安装 HUD，不修改 Qoder 设置。
 - `-NoStart`：安装后不启动 HUD。
 - `-SkipStartup`：不触碰开机自启快捷方式，主要用于测试。
