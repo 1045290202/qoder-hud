@@ -766,7 +766,7 @@ namespace QoderHud
             goBtn = new PillButton(this, 620, 14, 154, 38, "前往 Qoder", true);
             closeBtn = new PillButton(this, 786, 14, 154, 38, "关闭任务", false);
             backBtn.Click += delegate { CloseDetail(); };
-            goBtn.Click += delegate { FocusQoder(); };
+            goBtn.Click += delegate { FocusQoder(detailTask); };
             closeBtn.Click += delegate { DismissDetailTask(); };
             detailView.Children.Add(backBtn);
             detailView.Children.Add(goBtn);
@@ -1900,7 +1900,7 @@ namespace QoderHud
             {
                 pendingClickTask = null;
                 suppressClickUntil = DateTime.Now.AddMilliseconds(250);
-                FocusQoder();
+                FocusQoder(t);
                 Log("focus " + ShortId(t.SessionId));
             }
             else
@@ -1923,7 +1923,7 @@ namespace QoderHud
             if (cardMenu == null)
             {
                 cardMenu = CreateMenu();
-                cardMenu.Items.Add(MenuItem("前往 Qoder", delegate { FocusQoder(); }));
+                cardMenu.Items.Add(MenuItem("前往 Qoder", delegate { FocusQoder(menuTask); }));
                 cardMenu.Items.Add(MenuItem("关闭任务", delegate { CloseMenuTask(); }));
             }
             try { cardMenu.Show(Forms.Cursor.Position); }
@@ -1968,39 +1968,156 @@ namespace QoderHud
             AfterTasksChanged();
         }
 
-        static void FocusQoder()
+        static readonly string[] TerminalHostNames =
+        {
+            "WindowsTerminal", "Alacritty", "WezTerm", "Hyper", "Tabby",
+            "FluentTerminal", "Mintty", "Terminus", "Wave", "Contour"
+        };
+
+        static readonly string[] ConsoleProcessNames =
+        {
+            "conhost", "OpenConsole", "cmd", "powershell", "pwsh", "bash", "wsl"
+        };
+
+        void FocusQoder(HudTask task)
         {
             try
             {
+                string origin = task != null ? task.Origin : "";
+                string chain = task != null ? task.OriginChain : "";
                 IntPtr best = IntPtr.Zero;
-                Process[] ps = Process.GetProcessesByName("Qoder");
-                foreach (Process p in ps)
+                if (origin == "JetBrains")
+                {
+                    ShowFocusError(origin);
+                    return;
+                }
+                if (origin == "CLI")
+                {
+                    string terminal = FindTerminalHostName(chain);
+                    if (terminal.Length > 0) best = FindMainWindow(terminal, "");
+                    if (best == IntPtr.Zero)
+                    {
+                        string console = FindChainProcessName(chain, ConsoleProcessNames);
+                        if (console.Length > 0) best = FindMainWindow(console, "");
+                    }
+                }
+                else if (origin == "Desktop")
+                {
+                    best = FindMainWindow("Qoder", "Qoder");
+                }
+                if (best == IntPtr.Zero)
+                {
+                    Log("focus target not found origin=" + origin);
+                    ShowFocusError(origin);
+                    return;
+                }
+                ActivateWindow(best);
+            }
+            catch
+            {
+                ShowFocusError(task != null ? task.Origin : "");
+            }
+        }
+
+        static void ShowFocusError(string origin)
+        {
+            string message;
+            if (origin == "JetBrains") message = "JetBrains 插件暂不支持自动跳转。";
+            else if (origin == "CLI") message = "未找到任务对应的终端窗口。";
+            else if (origin == "Desktop") message = "未找到 Qoder 窗口。";
+            else message = "无法识别任务来源，未执行跳转。";
+            MessageBox.Show(message, "Qoder HUD", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        static string FindTerminalHostName(string chain)
+        {
+            foreach (string raw in ChainParts(chain))
+            {
+                string name = ProcessName(raw);
+                if (name.Equals("wt", StringComparison.OrdinalIgnoreCase)) return "WindowsTerminal";
+                if (NameInList(name, TerminalHostNames)) return name;
+            }
+            return "";
+        }
+
+        static string FindChainProcessName(string chain, string[] names)
+        {
+            foreach (string raw in ChainParts(chain))
+            {
+                string name = ProcessName(raw);
+                if (NameInList(name, names)) return name;
+            }
+            return "";
+        }
+
+        static bool NameInList(string name, string[] names)
+        {
+            foreach (string candidate in names)
+                if (name.Equals(candidate, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        static string[] ChainParts(string chain)
+        {
+            if (string.IsNullOrEmpty(chain)) return new string[0];
+            return chain.Split(new string[] { "<-" }, StringSplitOptions.None);
+        }
+
+        static string ProcessName(string raw)
+        {
+            string name = (raw ?? "").Trim().Trim('"');
+            int slash = Math.Max(name.LastIndexOf('\\'), name.LastIndexOf('/'));
+            if (slash >= 0) name = name.Substring(slash + 1);
+            if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                name = name.Substring(0, name.Length - 4);
+            return name;
+        }
+
+        static IntPtr FindMainWindow(string processName, string preferredTitle)
+        {
+            if (string.IsNullOrEmpty(processName)) return IntPtr.Zero;
+            Process[] processes = Process.GetProcessesByName(processName);
+            try
+            {
+                IntPtr best = IntPtr.Zero;
+                foreach (Process p in processes)
                 {
                     IntPtr h = p.MainWindowHandle;
                     if (h == IntPtr.Zero) continue;
                     if (best == IntPtr.Zero) best = h;
-                    if (p.MainWindowTitle == "Qoder") best = h;
+                    if (preferredTitle.Length > 0 && p.MainWindowTitle == preferredTitle) best = h;
                 }
-                if (best == IntPtr.Zero) return;
-                if (Native.IsIconic(best)) Native.ShowWindow(best, 9); // SW_RESTORE
-                if (!Native.SetForegroundWindow(best))
+                return best;
+            }
+            finally
+            {
+                foreach (Process p in processes) p.Dispose();
+            }
+        }
+
+        static void ActivateWindow(IntPtr hwnd)
+        {
+            if (Native.IsIconic(hwnd)) Native.ShowWindow(hwnd, 9); // SW_RESTORE
+            if (!Native.SetForegroundWindow(hwnd))
+            {
+                uint fg = Native.GetWindowThreadProcessId(Native.GetForegroundWindow(), IntPtr.Zero);
+                uint target = Native.GetWindowThreadProcessId(hwnd, IntPtr.Zero);
+                if (fg != 0 && target != 0 && fg != target)
                 {
-                    uint fg = Native.GetWindowThreadProcessId(Native.GetForegroundWindow(), IntPtr.Zero);
-                    uint target = Native.GetWindowThreadProcessId(best, IntPtr.Zero);
-                    if (fg != 0 && target != 0 && fg != target)
+                    Native.AttachThreadInput(fg, target, true);
+                    try
                     {
-                        Native.AttachThreadInput(fg, target, true);
-                        Native.ShowWindow(best, 5); // SW_SHOW
-                        Native.SetForegroundWindow(best);
+                        Native.ShowWindow(hwnd, 5); // SW_SHOW
+                        Native.SetForegroundWindow(hwnd);
+                    }
+                    finally
+                    {
                         Native.AttachThreadInput(fg, target, false);
                     }
-                    Native.SetForegroundWindow(best);
                 }
-                Native.BringWindowToTop(best);
+                Native.SetForegroundWindow(hwnd);
             }
-            catch
-            {
-            }
+            Native.BringWindowToTop(hwnd);
         }
 
         // ---------------- rendering ----------------
