@@ -2,7 +2,7 @@
 
 在副屏、小屏或桌面角落显示 Qoder 任务的实时仪表盘。集中展示 Qoder Desktop、JetBrains 插件和 qodercli 会话的来源、标题、状态、当前工具和最近活动。
 
-当前版本：**1.0.1** · Windows 10/11 · WPF/GPU 渲染 · MIT
+当前版本：**1.0.2** · Windows 10/11 · WPF/GPU 渲染 · MIT
 
 ![Qoder HUD 界面预览](docs/images/hud.png)
 
@@ -12,7 +12,7 @@
 
 - 来源标记：Qoder Desktop、JetBrains、CLI、未知来源。
 - 任务标题来自 Qoder 本地数据库或 JetBrains idea.log，失败时回退到用户输入。
-- 单击打开详情，双击切换到 Qoder，右键菜单不会误关任务。
+- 单击打开详情；Desktop 任务可双击切换到 Qoder，JetBrains/CLI 暂不支持自动跳转。
 - 运行 / 等待 / 完成三态，显示模型、会话、当前工具、耗时和动作记录。
 - 滚动列表带 200ms 缓出动画；托盘显示/隐藏、清空已完成、置顶开关。
 - WPF 保留模式 + GPU 合成，静态画面不整帧重绘。
@@ -30,7 +30,7 @@ HUD 可以独立运行；没有 Qoder 或 hooks 时会显示空闲界面。
 
 ## 安装
 
-1. 从 GitHub Releases 下载 `QoderHud-1.0.1.zip` 并解压。
+1. 从 GitHub Releases 下载 `QoderHud-1.0.2.zip` 并解压。
 2. 双击 `install.cmd`；需要开机自启时运行 `install.cmd -Autostart`。
 3. 重启 Qoder 或新开一个会话，让新的 hooks 生效。
 
@@ -73,8 +73,8 @@ HUD 可以独立运行；没有 Qoder 或 hooks 时会显示空闲界面。
 ## 使用
 
 - 单击任务：打开详情。
-- 双击任务：切换到 Qoder。
-- 右键任务：前往 Qoder / 关闭任务。
+- 双击 Desktop 任务：切换到 Qoder；JetBrains/CLI 会显示暂不支持提示。
+- 右键任务：前往 Qoder / 关闭任务；前往操作同样仅对 Desktop 生效。
 - 右键空白处：托盘主菜单。
 - 右上角“置顶”：切换置顶并保存。
 - 滚轮：滚动任务列表。

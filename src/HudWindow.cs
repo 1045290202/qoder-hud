@@ -603,7 +603,7 @@ namespace QoderHud
             cardsCanvas.RenderTransform = cardsShift;
             listViewport.Children.Add(cardsCanvas);
 
-            hintText = Txt("单击任务查看详情 · 双击直接前往 Qoder", 14, TextTertiary, false, false);
+            hintText = Txt("单击任务查看详情 · Desktop 双击前往 Qoder", 14, TextTertiary, false, false);
             Canvas.SetLeft(hintText, CardX + 4);
             Canvas.SetTop(hintText, ContentTop);
             hintText.Visibility = Visibility.Collapsed;
@@ -2288,7 +2288,7 @@ namespace QoderHud
             {
                 hintText.Visibility = Visibility.Visible;
                 Canvas.SetTop(hintText, ContentTop + tasks.Count * CardStep() + 4);
-                SetText(hintText, "单击任务查看详情 · 双击直接前往 Qoder");
+                SetText(hintText, "单击任务查看详情 · Desktop 双击前往 Qoder");
             }
             else hintText.Visibility = Visibility.Collapsed;
         }
